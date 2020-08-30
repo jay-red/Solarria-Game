@@ -242,7 +242,7 @@ function update_player( ts, player ) {
 	c = true;
 	if( ent.dy > 0 ) {
 		var left_tile = Math.floor( next_x / 8 );
-		var right_tile = Math.floor( ( next_x + ent.width ) / 8 );
+		var right_tile = Math.floor( ( next_x + ent.width - 1 ) / 8 );
 		var start_tile_y = Math.floor( ( last_y + ent.height - 1 ) / 8 );
 		var end_tile_y = Math.floor( ( next_y + ent.height ) / 8 );
 		for( tx = left_tile; tx <= right_tile && c; ++tx ) {
@@ -258,7 +258,7 @@ function update_player( ts, player ) {
 		}
 	} else if( ent.dy < 0 ) {
 		var left_tile = Math.floor( next_x / 8 );
-		var right_tile = Math.floor( ( next_x + ent.width ) / 8 );
+		var right_tile = Math.floor( ( next_x + ent.width - 1 ) / 8 );
 		var start_tile_y = Math.floor( last_y / 8 );
 		var end_tile_y = Math.floor( next_y / 8 );
 		for( tx = left_tile; tx <= right_tile && c; ++tx ) {
