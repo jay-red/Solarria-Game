@@ -1,3 +1,6 @@
+var URL = document.location.href,
+	SERVER = URL.indexOf( "server" ) >= 0;
+
 var KEY_A = 65,
 	KEY_D = 68,
 	KEY_SPACE = 32;
@@ -29,7 +32,9 @@ var anims_idle = [null, null, null, null],
 	view_x = 240 * WIDTH_TILE,
 	view_y = 400 * HEIGHT_TILE,
 	keys = {},
-	me = null;
+	me = null,
+	conn = null, 
+	received = 0;
 
 function key_down( key ) {
 	if( keys.hasOwnProperty( key ) ) {
@@ -292,7 +297,7 @@ function update_players( ts ) {
 	for( var i = 0; i < 4; ++i ) {
 		player = players[ i ];
 		if( player.active ) {
-			if( me.id == i ) {
+			if( !SERVER && me.id == i ) {
 				update_me( ts );
 				update_player( ts, player );
 				view_x = Math.floor( player.ent.x - HWIDTH_VIEWPORT + ( player.ent.width >> 2 ) );
@@ -346,7 +351,10 @@ function draw_viewport( ts ) {
 function update_loop( ts ) {
 	update_boss( ts );
 	update_players( ts );
-	draw_viewport( ts );
+	if( !SERVER ) {
+		draw_viewport( ts );
+		conn.send( JSON.stringify( { "action" : "move", "id" : me.id, "player" : serialize_player( players[ me.id ] ) } ) );
+	}
 	window.requestAnimationFrame( update_loop );
 }
 
@@ -375,6 +383,104 @@ function callback_gen( evt ) {
 	init_render_tiles( callback_render_tiles, tiles );
 }
 
+function callback_server( evt ) {
+	conn = evt;
+	init_gen( callback_gen, 0xFFFF );
+}
+
+function callback_client( evt ) {
+	conn = evt;
+	conn.send( JSON.stringify( { "action" : "join" } ) );
+}
+
+function serialize_player( player ) {
+	var data = {};
+	data.ent = player.ent;
+	data.flight_time = player.flight_time;
+	data.time_jump = player.time_jump;
+	data.flying = player.flying;
+	data.alive = player.alive;
+}
+
+function handle_msg( channel, msg ) {
+	console.log( msg );
+	var data = JSON.parse( msg );
+	if( SERVER ) {
+		switch( data.action ) {
+			case "join":
+				for( var i = 0; i < 4; ++i ) {
+					if( players[ i ].active == false ) {
+						players[ i ].active = true;
+						players[ i ].alive = true;
+						console.log(JSON.stringify( { "action" : "join", "data" : i, width : TWIDTH_GAME } ));
+						channel.send( JSON.stringify( { "action" : "join", "data" : i, "height" : THEIGHT_GAME } ) );
+						for( var y = 0; y < THEIGHT_GAME; ++y ) {
+							channel.send( JSON.stringify( { "action" : "tiles", "y" : y, "row" : tiles[ y ] } ) );
+						}
+						return;
+					}
+				}
+				channel.send( JSON.stringify( { "action" : "join", "data" : -1 } ) );
+				break;
+			case "joined":
+				conn.send( JSON.stringify( { "action" : "joined", "id" : data.id } ) );
+				break;
+			default:
+				break;
+		}
+	} else {
+		switch( data.action ) {
+			case "join":
+				if( data.data == -1 ) {
+
+				} else {
+					me = new Me( data.data );
+					players[ data.data ].active = true;
+					players[ data.data ].alive = true;
+					THEIGHT_GAME = data.height;
+					tiles = [];
+					for( var y = 0; y < THEIGHT_GAME; ++y ) tiles.push( null );
+				}
+				break;
+			case "tiles":
+				tiles[ data.y ] = data.row;
+				TWIDTH_GAME = data.row.length;
+				WIDTH_GAME = TWIDTH_GAME * WIDTH_TILE;
+				HEIGHT_GAME = THEIGHT_GAME * HEIGHT_TILE;
+				if( ++received == THEIGHT_GAME ) {
+					conn.send( JSON.stringify( { "action" : "joined", "id" : me.id } ) );
+				}
+				break;
+			case "joined":
+				if( data.id == me.id ) {
+					init_render_tiles( callback_render_tiles, tiles );
+				} else {
+					players[ data.id ].active = true;
+					players[ data.id ].alive = true;
+				}
+				break;
+			case "update":
+				if( data.id == me.id ) return;
+				data = data.player;
+				var player = players[ data.id ];
+				player.ent.x = data.ent.x;
+				player.ent.y = data.ent.y;
+				player.ent.dx = data.ent.dx;
+				player.ent.dy = data.ent.dy;
+				player.ent.width = data.ent.width;
+				player.ent.height = data.ent.height;
+				player.ent.direction = data.ent.direction;
+				player.flight_time = data.flight_time;
+				player.time_jump = data.time_jump;
+				player.flying = data.flying;
+				player.alive = data.alive;
+				player.active = true;
+			default:
+				break;
+		}
+	}
+}
+
 function callback_anim( evt ) {
 	anim = evt;
 	anims_idle[ 0 ] = anim.IDLE_1;
@@ -393,12 +499,13 @@ function callback_anim( evt ) {
 	anims_flap[ 1 ] = anim.FLAP_2;
 	anims_flap[ 2 ] = anim.FLAP_3;
 	anims_flap[ 3 ] = anim.FLAP_4;
-	me = new Me( 0 );
 	init_players();
-	players[ 0 ].active = true;
-	players[ 0 ].alive = true;
 	init_projectiles();
-	init_gen( callback_gen, 0xFFFF );
+	if( SERVER ) {
+		init_server( callback_server, handle_msg );
+	} else {
+		init_client( callback_client, handle_msg );
+	}
 }
 
 init_anim( callback_anim );
