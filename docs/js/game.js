@@ -409,7 +409,6 @@ function serialize_player( player ) {
 }
 
 function handle_msg( channel, msg ) {
-	console.log( msg );
 	var data = JSON.parse( msg );
 	if( SERVER ) {
 		switch( data.action ) {
