@@ -34,7 +34,8 @@ var anims_idle = [null, null, null, null],
 	keys = {},
 	me = null,
 	conn = null, 
-	received = 0;
+	received = 0,
+	last_send = -1;
 
 function key_down( key ) {
 	if( keys.hasOwnProperty( key ) ) {
@@ -353,7 +354,11 @@ function update_loop( ts ) {
 	update_players( ts );
 	if( !SERVER ) {
 		draw_viewport( ts );
-		conn.send( JSON.stringify( { "action" : "move", "id" : me.id, "player" : serialize_player( players[ me.id ] ) } ) );
+		if( last_send == -1 ) last_send = ts;
+		if( ts - last_send > 50 ) {
+			conn.send( JSON.stringify( { "action" : "update", "id" : me.id, "player" : serialize_player( players[ me.id ] ) } ) );
+			last_send = ts;
+		}
 	}
 	window.requestAnimationFrame( update_loop );
 }
@@ -400,6 +405,7 @@ function serialize_player( player ) {
 	data.time_jump = player.time_jump;
 	data.flying = player.flying;
 	data.alive = player.alive;
+	return data;
 }
 
 function handle_msg( channel, msg ) {
@@ -425,6 +431,22 @@ function handle_msg( channel, msg ) {
 			case "joined":
 				conn.send( JSON.stringify( { "action" : "joined", "id" : data.id } ) );
 				break;
+			case "update":
+				var player = players[ data.id ];
+				data = data.player;
+				player.ent.x = data.ent.x;
+				player.ent.y = data.ent.y;
+				player.ent.dx = data.ent.dx;
+				player.ent.dy = data.ent.dy;
+				player.ent.width = data.ent.width;
+				player.ent.height = data.ent.height;
+				player.ent.direction = data.ent.direction;
+				player.flight_time = data.flight_time;
+				player.time_jump = data.time_jump;
+				player.flying = data.flying;
+				player.alive = data.alive;
+				player.active = true;
+				conn.send( msg );
 			default:
 				break;
 		}
@@ -461,8 +483,8 @@ function handle_msg( channel, msg ) {
 				break;
 			case "update":
 				if( data.id == me.id ) return;
-				data = data.player;
 				var player = players[ data.id ];
+				data = data.player;
 				player.ent.x = data.ent.x;
 				player.ent.y = data.ent.y;
 				player.ent.dx = data.ent.dx;
