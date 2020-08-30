@@ -78,6 +78,7 @@ function init_client( cb_open, cb_msg ) {
 					firebase.database().ref( "/servers/" + room + "/players/" + key + "/msg/" ).push().set( data, callback_empty );
 				}, function( err ) {} );
 			case "ice":
+				console.log(action.ice);
 				rtc.addIceCandidate( new RTCIceCandidate( JSON.parse( action.ice ) ) );
 				break;
 			case "answer":
