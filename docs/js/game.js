@@ -146,7 +146,7 @@ function update_me( ts ) {
 
 function get_tile( x, y ) {
 	if( x >= 0 && x < TWIDTH_GAME ) {
-		if( y >= 0 && y < HEIGHT_GAME ) {
+		if( y >= 0 && y < THEIGHT_GAME ) {
 			return tiles[ y ][ x ] & 0xFF;
 		}
 	}
