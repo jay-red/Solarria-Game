@@ -13,7 +13,10 @@ var WIDTH_TILE = 8,
 	HWIDTH_VIEWPORT = WIDTH_VIEWPORT >> 1,
 	HHEIGHT_VIEWPORT = HEIGHT_VIEWPORT >> 1,
 	WIDTH_GAME,
-	HEIGHT_GAME;
+	HEIGHT_GAME,
+	LEFT_MB_DOWN = false;
+	MID_MB_DOWN = false;
+	RIGHT_MB_DOWN = false;
 
 var TERMINAL_VELOCITY = 0.5,
 	MAX_FLIGHT = -0.35,
@@ -31,11 +34,16 @@ var anims_idle = [null, null, null, null],
 	game_ctx,
 	view_x = 240 * WIDTH_TILE,
 	view_y = 400 * HEIGHT_TILE,
+	cursor_vx = 0,
+	cursor_vy = 0,
+	cursor_x = 0,
+	cursor_y = 0,
 	keys = {},
 	me = null,
 	conn = null, 
 	received = 0,
-	last_send = -1;
+	last_send = -1,
+	renderer = null;
 
 function key_down( key ) {
 	if( keys.hasOwnProperty( key ) ) {
@@ -249,7 +257,20 @@ function update_player( ts, player ) {
 			}
 		}
 	} else if( ent.dy < 0 ) {
-		
+		var left_tile = Math.floor( next_x / 8 );
+		var right_tile = Math.floor( ( next_x + ent.width ) / 8 );
+		var start_tile_y = Math.floor( last_y / 8 );
+		var end_tile_y = Math.floor( next_y / 8 );
+		for( tx = left_tile; tx <= right_tile && c; ++tx ) {
+			for( ty = start_tile_y; ty >= end_tile_y; --ty ) {
+				if( get_tile( tx, ty ) != 0 ) {
+					next_y = ( ty + 1 ) * HEIGHT_TILE;
+					ent.dy = 0;
+					c = false;
+					break;
+				}
+			}
+		}
 	}
 
 	if( next_y + ent.height >= HEIGHT_GAME ) {
@@ -349,11 +370,40 @@ function draw_viewport( ts ) {
 	draw_players( ts );
 }
 
+function break_tile( x, y ) {
+	tiles[ y ][ x ] = 0;
+	renderer.orient_tile( x, y );
+	renderer.draw_tile( x, y );
+	if( x - 1 >= 0 ) renderer.orient_tile( x - 1, y );
+	if( y + 1 < THEIGHT_GAME ) renderer.orient_tile( x, y + 1 );
+	if( y - 1 >= 0 ) renderer.orient_tile( x, y - 1 );
+	if( x + 1 < TWIDTH_GAME ) renderer.orient_tile( x + 1, y );
+	if( x - 1 >= 0 ) renderer.draw_tile( x - 1, y );
+	if( y + 1 < THEIGHT_GAME ) renderer.draw_tile( x, y + 1 );
+	if( y - 1 >= 0 ) renderer.draw_tile( x, y - 1 );
+	if( x + 1 < TWIDTH_GAME ) renderer.draw_tile( x + 1, y );
+}
+
 function update_loop( ts ) {
 	update_boss( ts );
 	update_players( ts );
 	if( !SERVER ) {
 		draw_viewport( ts );
+		cursor_x = ( cursor_vx + view_x );
+		cursor_y = ( cursor_vy + view_y );
+		if( LEFT_MB_DOWN ) {
+			var tile_x = Math.floor( cursor_x / 8 );
+			var tile_y = Math.floor( cursor_y / 8 );
+			console.log( tile_x, tile_y );
+			if( get_tile( tile_x, tile_y ) != 0 ) {
+				break_tile( tile_x, tile_y );
+				conn.send( JSON.stringify( { "action" : "break", "id" : me.id, "x" : tile_x, "y" : tile_y } ) );
+			}
+		} else if( RIGHT_MB_DOWN ) {
+			var tile_x = Math.floor( cursor_x / 8 );
+			var tile_y = Math.floor( cursor_x / 8 );
+
+		}
 		if( last_send == -1 ) last_send = ts;
 		if( ts - last_send > 50 ) {
 			conn.send( JSON.stringify( { "action" : "update", "id" : me.id, "player" : serialize_player( players[ me.id ] ) } ) );
@@ -363,6 +413,39 @@ function update_loop( ts ) {
 	window.requestAnimationFrame( update_loop );
 }
 
+function handle_mousemove( e ) {
+	var rect = this.getBoundingClientRect();
+	cursor_vx = ( ( e.clientX - rect.left ) / rect.width * WIDTH_VIEWPORT ) | 0;
+	cursor_vy = ( ( e.clientY - rect.top ) / rect.height * HEIGHT_VIEWPORT ) | 0;
+}
+
+function handle_mousedown( e ) {
+	switch( e.which ) {
+		case 1: // left
+			LEFT_MB_DOWN = true;
+			break;
+		case 2: // middle
+			MID_MB_DOWN = true;
+			break;
+		case 3: // right
+			RIGHT_MB_DOWN = true;
+			break;
+	}
+}
+
+function handle_mouseup( e ) {
+	switch( e.which ) {
+		case 1: // left
+			LEFT_MB_DOWN = false;
+			break;
+		case 2: // middle
+			MID_MB_DOWN = false;
+			break;
+		case 3: // right
+			RIGHT_MB_DOWN = false;
+			break;
+	}
+}
 
 function handle_keydown( evt ) {
 	keys[ evt.keyCode ] = true;
@@ -372,10 +455,20 @@ function handle_keyup( evt ) {
 	keys[ evt.keyCode ] = false;
 }
 
+function handle_contextmenu( e ) {
+	e.preventDefault();
+	return false;
+}
+
 function callback_render_tiles( evt ) {
+	renderer = evt;
 	tile_canvas = evt.canvas;
 	document.addEventListener( "keydown", handle_keydown );
 	document.addEventListener( "keyup", handle_keyup );
+	game_canvas.addEventListener( "mousemove", handle_mousemove );
+	game_canvas.addEventListener( "mousedown", handle_mousedown );
+	game_canvas.addEventListener( "mouseup", handle_mouseup );
+	game_canvas.addEventListener( "contextmenu", handle_contextmenu );
 	window.requestAnimationFrame( update_loop );
 }
 
@@ -427,6 +520,10 @@ function handle_msg( channel, msg ) {
 				}
 				channel.send( JSON.stringify( { "action" : "join", "data" : -1 } ) );
 				break;
+			case "break":
+				tiles[ data.y ][ data.x ] = 0;
+				conn.send( msg );
+				break;
 			case "joined":
 				conn.send( JSON.stringify( { "action" : "joined", "id" : data.id } ) );
 				players[ data.id ].active = true;
@@ -464,6 +561,10 @@ function handle_msg( channel, msg ) {
 					tiles = [];
 					for( var y = 0; y < THEIGHT_GAME; ++y ) tiles.push( null );
 				}
+				break;
+			case "break":
+				if( data.id == me.id ) return;
+				break_tile( data.x, data.y );
 				break;
 			case "tiles":
 				tiles[ data.y ] = data.row;

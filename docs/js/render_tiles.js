@@ -24,6 +24,7 @@ function init_render_tiles( cb, t, s ) {
 
 	function draw_tile( x, y ) {
 		var tile = tiles[ y ][ x ];
+		tile_ctx.clearRect( x * WIDTH_TILE, y * HEIGHT_TILE, WIDTH_TILE, HEIGHT_TILE );
 		if( tile == 0 ) return;
 		var idx = ( tile >> 8 ) & 0xF;
 		var v = ( tile >> 12 ) & 0xF;
@@ -77,7 +78,14 @@ function init_render_tiles( cb, t, s ) {
 			else if( !right ) tiles[ y ][ x ] |= ( 0x2 << 8 );
 			else if( !down ) tiles[ y ][ x ] |= ( 0x3 << 8 );
 			else if( !left ) tiles[ y ][ x ] |= ( 0x4 << 8 );
-		} 
+		}
+		if( tiles[ y ][ x ] != 0 ) {
+			if( ( ( Math.random() * 50 ) | 0 ) == 0 ) {
+				tiles[ y ][ x ] |= 1 << 12;
+			} else {
+				tiles[ y ][ x ] |= 0;
+			}
+		}
 	}
 
 	function callback_loaded() {
@@ -85,17 +93,12 @@ function init_render_tiles( cb, t, s ) {
 		for( y = 0; y < HEIGHT_TILES; ++y ) {
 			for( x = 0; x < WIDTH_TILES; ++x ) {
 				orient_tile( x, y );
-				if( tiles[ y ][ x ] != 0 ) {
-					if( ( ( Math.random() * 50 ) | 0 ) == 0 ) {
-						tiles[ y ][ x ] |= 1 << 12;
-					} else {
-						tiles[ y ][ x ] |= 0;
-					}
-				}
 				draw_tile( x, y );
 			}
 		}
 		evt[ "canvas" ] = tile_canvas;
+		evt[ "orient_tile" ] = orient_tile;
+		evt[ "draw_tile" ] = draw_tile;
 		CALLBACK( evt );
 	}
 
