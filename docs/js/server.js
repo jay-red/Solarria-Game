@@ -50,7 +50,9 @@ function init_server( cb_init, cb_msg ) {
 	function send( msg ) {
 		var arr = Object.entries( joined );
 		for( var i = 0; i < arr.length; ++i ) {
-			arr[ i ][ 1 ].channel.send( msg );
+			if( arg[ i ][ 1 ].channel.readyState == "open" ) {
+				arr[ i ][ 1 ].channel.send( msg );
+			}
 		}
 	}
 

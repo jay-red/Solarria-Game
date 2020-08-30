@@ -408,7 +408,7 @@ function serialize_player( player ) {
 	return data;
 }
 
-function handle_msg( channel, msg ) {
+function handle_msg( channel, msg ) {	
 	var data = JSON.parse( msg );
 	if( SERVER ) {
 		switch( data.action ) {
@@ -429,6 +429,8 @@ function handle_msg( channel, msg ) {
 				break;
 			case "joined":
 				conn.send( JSON.stringify( { "action" : "joined", "id" : data.id } ) );
+				players[ data.id ].active = true;
+				players[ data.id ].alive = true;
 				break;
 			case "update":
 				var player = players[ data.id ];
