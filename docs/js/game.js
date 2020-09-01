@@ -233,7 +233,7 @@ function update_player( ts, player ) {
 		}
 		if( !c && player.time_jump == -1 ) {
 			if( check_clearance( Math.floor( ( next_x - 1 ) / 8 ), down_tile ) && 
-				check_clearance( Math.floor( ( next_x - 1 ) / 8 ), down_tile ) + 1 ) {
+				check_clearance( Math.floor( ( next_x - 1 ) / 8 ) + 1, down_tile ) ) {
 				ent.dy = 0;
 				next_y = ( down_tile - 1 ) * HEIGHT_TILE - ent.height;
 				next_x -= 1;
