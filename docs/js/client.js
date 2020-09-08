@@ -1,6 +1,6 @@
 function init_client( cb_open, cb_msg ) {
 	var RTC_CFG = { 
-			iceServers : [ { urls : "stun:stun2.1.google.com:19302" } ] 
+			iceServers : [ { urls : "stun:stun.l.google.com:19302" } ] 
 		},
 		RTC_OPT = {
 			optional : [ { RtpDataChannels : false } ]
